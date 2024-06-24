@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Object Detection using TensorFlow.js</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        #videoContainer {
+            position: relative;
+        }
+
+        #videoElement {
+            width: 100%;
+            max-width: 600px;
+            border: 2px solid #333;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .button-container {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Real-time Object Detection using TensorFlow.js</h1>
+    <div id="videoContainer">
+        <video id="videoElement" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="button-container">
+        <button onclick="switchCamera('environment')">Switch to Back Camera</button>
+        <button onclick="switchCamera('user')">Switch to Front Camera</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script>
+        let currentFacingMode = 'environment'; // Default to back camera
+
+        async function startObjectDetection() {
+            const videoElement = document.getElementById('videoElement');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            try {
+                const stream = await getCameraStream(currentFacingMode);
+
+                videoElement.srcObject = stream;
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    canvas.width = videoElement.videoWidth;
+                    canvas.height = videoElement.videoHeight;
+
+                    const modelPromise = cocoSsd.load();
+
+                    modelPromise.then(model => {
+                        async function detectFrame() {
+                            const predictions = await model.detect(videoElement);
+                            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+                            predictions.forEach(prediction => {
+                                ctx.beginPath();
+                                ctx.rect(...prediction.bbox);
+                                ctx.lineWidth = 2;
+                                ctx.strokeStyle = 'green';
+                                ctx.fillStyle = 'green';
+                                ctx.stroke();
+
+                                // Draw dark background for the label
+                                const textWidth = ctx.measureText(`${prediction.class} (${prediction.score.toFixed(2)})`).width;
+                                ctx.fillRect(prediction.bbox[0], prediction.bbox[1] - 20, textWidth + 8, 20);
+
+                                // Draw text with white color
+                                ctx.fillStyle = 'white';
+                                ctx.fillText(`${prediction.class} (${prediction.score.toFixed(2)})`, prediction.bbox[0] + 4, prediction.bbox[1] - 5);
+                            });
+
+                            requestAnimationFrame(detectFrame);
+                        }
+
+                        // Start detecting frames
+                        detectFrame();
+                    }).catch(error => {
+                        console.error('Error loading model:', error);
+                    });
+                };
+            } catch (error) {
+                console.error('Error accessing the camera:', error);
+            }
+        }
+
+        async function getCameraStream(facingMode) {
+            const constraints = {
+                video: {
+                    facingMode: facingMode
+                }
+            };
+
+            return await navigator.mediaDevices.getUserMedia(constraints);
+        }
+
+        function switchCamera(facingMode) {
+            currentFacingMode = facingMode;
+            startObjectDetection(); // Restart object detection with the new camera
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            startObjectDetection();
+        });
+    </script>
+</body>
+
+</html>
