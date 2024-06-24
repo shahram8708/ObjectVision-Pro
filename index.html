@@ -151,7 +151,7 @@
             const waitingMessage = document.getElementById('waitingMessage');
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const stream = await getPreferredCameraStream();
 
                 videoElement.srcObject = stream;
                 videoElement.onloadedmetadata = () => {
@@ -196,7 +196,26 @@
                 };
             } catch (error) {
                 console.error('Error accessing the webcam:', error);
+                waitingMessage.innerText = 'Failed to access camera';
+                waitingMessage.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+                waitingMessage.style.display = 'block';
             }
+        }
+
+        async function getPreferredCameraStream() {
+            const constraints = {
+                video: {
+                    facingMode: { ideal: 'environment' }
+                }
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            if (!stream) {
+                return navigator.mediaDevices.getUserMedia({ video: true });
+            }
+
+            return stream;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
